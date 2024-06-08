@@ -22,7 +22,7 @@ Creche is an alternative to `Command` and friends in the standard library.
 
 ## Examples
 
-Read output of `ls` into a `String`:
+Read output of `cat` into a `String`:
 
 ```rust
 // configure the child process
