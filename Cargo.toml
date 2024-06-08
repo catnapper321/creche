@@ -1,0 +1,19 @@
+[package]
+name = "creche"
+version = "0.1.0"
+edition = "2021"
+
+license = "MIT OR Apache-2.0"
+description = """
+A replacement for std::process::Command and related types in the standard library. Runs single processes, and pipelines of processes, with configuration of file descriptors and environment for each child process.
+"""
+repository = "https://github.com/catnapper321/creche"
+keywords = ["pipe", "child", "command", "scripting", "process"]
+categories = ["concurrency"]
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["lib"]
+
+[dependencies]
+nix = {version = "*", features = ["fs", "process"]}
