@@ -575,6 +575,12 @@ pub mod pipeline {
     ///
     /// The [`Self::quiet()`] method may be used to suppress stderr output.
     ///
+    /// The general pattern for constructing pipelines is to build each
+    /// child process first, configuring their environments and fd
+    /// redirects to files and such first - everything except the
+    /// interprocess pipe between stdout and stdin. Then add the
+    /// `ChildBuilder`s to the pipeline.
+    ///
     /// Example:
     /// ```
     ///    let mut ls_cmd = ChildBuilder::new("ls");
