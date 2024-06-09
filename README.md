@@ -20,6 +20,19 @@ Creche is an alternative to `Command` and friends in the standard library.
 - Doesn't do chdir/chroot yet
 - No async support yet
 
+## How to Use
+
+Add this to the dependencies in `Cargo.toml`:
+
+```rust
+creche = "0.1"
+```
+The [`ChildBuilder`] and [`SimplePipelineBuilder`] types are top level exports, so many common use cases are enabled with a simple `use`:
+
+```rust
+use creche::*;
+```
+
 ## Examples
 
 Read output of `cat` into a `String`:
