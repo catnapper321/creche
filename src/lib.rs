@@ -659,16 +659,16 @@ pub mod pipeline {
 
             // set up interprocess pipes
             let mut pipe_read: Option<Box<InterprocessPipeRead>> = None;
-            let builders = HeadBodyTailIterMut::new(&mut self.builders);
+            let builders = HeadBodyTailIter::new(self.builders.iter_mut());
             for ref mut builder in builders {
                 match builder {
-                    HeadBodyTailMut::Only(_) => (),
-                    HeadBodyTailMut::Head(x) => {
+                    HeadBodyTail::Only(_) => (),
+                    HeadBodyTail::Head(x) => {
                         let (r, w) = interprocess_pipe(0, 1);
                         x.config_io(w);
                         pipe_read = Some(r);
                     }
-                    HeadBodyTailMut::Body(x) => {
+                    HeadBodyTail::Body(x) => {
                         let (r, w) = interprocess_pipe(0, 1);
                         x.config_io(w);
                         if let Some(prev_r) = pipe_read.take() {
@@ -676,7 +676,7 @@ pub mod pipeline {
                         }
                         pipe_read = Some(r);
                     }
-                    HeadBodyTailMut::Tail(x) => {
+                    HeadBodyTail::Tail(x) => {
                         if let Some(prev_r) = pipe_read.take() {
                             x.config_io(prev_r);
                         }
@@ -733,126 +733,47 @@ pub mod pipeline {
 }
 
 pub mod utils {
-
     #[derive(Debug)]
-    pub enum HeadBodyTail<'a, T> {
-        Only(&'a T),
-        Head(&'a T),
-        Body(&'a T),
-        Tail(&'a T),
+    pub enum HeadBodyTail<T> {
+        Only(T),
+        Head(T),
+        Body(T),
+        Tail(T),
     }
-    impl<'a, T> std::ops::Deref for HeadBodyTail<'a, T> {
-        type Target = T;
 
-        fn deref(&self) -> &Self::Target {
-            match self {
-                Self::Only(x) => x,
-                Self::Head(x) => x,
-                Self::Body(x) => x,
-                Self::Tail(x) => x,
+    #[derive(Default)]
+    pub struct HeadBodyTailIter<T, I: Iterator<Item=T>> {
+        next_item: Option<T>,
+        first: bool,
+        inner: I,
+    }
+
+    impl<T, I: Iterator<Item=T>> HeadBodyTailIter<T, I> {
+        pub fn new(mut inner: I) -> Self {
+            let next_item = inner.next();
+            Self {
+                inner, 
+                first: true,
+                next_item, 
             }
         }
     }
 
-    pub struct HeadBodyTailIter<'a, T> {
-        index: usize,
-        inner: &'a [T],
-    }
-    impl<'a, T> Iterator for HeadBodyTailIter<'a, T> {
-        type Item = HeadBodyTail<'a, T>;
+    impl<T, I: Iterator<Item=T>> Iterator for HeadBodyTailIter<T, I> {
+        type Item = HeadBodyTail<T>;
 
         fn next(&mut self) -> Option<Self::Item> {
-            if self.index == self.inner.len() {
-                return None;
-            }
-            let i = self.index;
-            self.index += 1;
-            let element = self.inner.get(i);
-            if self.inner.len() == 1 {
-                return element.map(Self::Item::Only);
-            }
-            if i == 0 {
-                return element.map(Self::Item::Head);
-            }
-            if self.index == self.inner.len() {
-                return element.map(Self::Item::Tail);
-            }
-            element.map(Self::Item::Body)
-        }
-    }
-    impl<'a, T> HeadBodyTailIter<'a, T> {
-        pub fn new(slice: &'a [T]) -> Self {
-            Self {
-                index: 0,
-                inner: slice,
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    pub enum HeadBodyTailMut<'a, T> {
-        Only(&'a mut T),
-        Head(&'a mut T),
-        Body(&'a mut T),
-        Tail(&'a mut T),
-    }
-    impl<'a, T> std::ops::Deref for HeadBodyTailMut<'a, T> {
-        type Target = T;
-
-        fn deref(&self) -> &Self::Target {
-            match self {
-                Self::Only(x) => x,
-                Self::Head(x) => x,
-                Self::Body(x) => x,
-                Self::Tail(x) => x,
-            }
-        }
-    }
-    impl<'a, T> std::ops::DerefMut for HeadBodyTailMut<'a, T> {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            match self {
-                Self::Only(x) => x,
-                Self::Head(x) => x,
-                Self::Body(x) => x,
-                Self::Tail(x) => x,
-            }
-        }
-    }
-
-    pub struct HeadBodyTailIterMut<'a, T> {
-        index: usize,
-        inner: &'a mut [T],
-    }
-    impl<'a, T> Iterator for HeadBodyTailIterMut<'a, T> {
-        type Item = HeadBodyTailMut<'a, T>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            if self.index == self.inner.len() {
-                return None;
-            }
-            let i = self.index;
-            self.index += 1;
-            // HACK: cast to *mut and back to evade the borrow checker
-            // Hopefully the 'a lifetime keeps this safe
-            let element = unsafe { self.inner.get_mut(i).map(|z| &mut *(z as *mut T)) };
-            if self.inner.len() == 1 {
-                return element.map(|x| Self::Item::Only(x));
-            }
-            if i == 0 {
-                return element.map(|x| Self::Item::Head(x));
-            }
-            if self.index == self.inner.len() {
-                return element.map(|x| Self::Item::Tail(x));
-            }
-            element.map(|x| Self::Item::Body(x))
-        }
-    }
-    impl<'a, T> HeadBodyTailIterMut<'a, T> {
-        pub fn new(slice: &'a mut [T]) -> Self {
-            Self {
-                index: 0,
-                inner: slice,
-            }
+            let current_item = self.next_item.take();
+            if current_item.is_none() { return None; }
+            self.next_item = self.inner.next();
+            let result = match (self.next_item.is_some(), self.first) {
+                (true, true) => current_item.map(HeadBodyTail::Head),
+                (false, true) => current_item.map(HeadBodyTail::Only),
+                (true, false) => current_item.map(HeadBodyTail::Body),
+                (false, false) => current_item.map(HeadBodyTail::Tail),
+            };
+            self.first = false;
+            result
         }
     }
 }
