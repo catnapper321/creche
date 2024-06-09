@@ -17,7 +17,6 @@ Creche is an alternative to `Command` and friends in the standard library.
 - Linux only
 - Doesn't support `nostd`
 - Doesn't handle child process priveleges/capabilities yet
-- Doesn't do chdir/chroot yet
 - No async support yet
 
 ## How to Use

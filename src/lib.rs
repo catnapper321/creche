@@ -510,7 +510,8 @@ mod creche {
             self.quiet_fd(2);
         }
 
-        /// Forks and execs a child process, returning a [`Child`] value. Use [`Child::wait()`] to collect the process exit status.
+        /// Forks and execs a child process, returning a [`Child`] value.
+        /// Use [`Child::wait()`] to collect the process exit status.
         pub fn spawn(mut self) -> Child {
             // sort the io configs in priority order
             self.io_configs
@@ -528,6 +529,12 @@ mod creche {
             // close the specified fds
             for fd in self.fds_to_close.iter() {
                 _ = nix::unistd::close(*fd);
+            }
+            if let Some(chroot) = self.chroot.take() {
+                nix::unistd::chroot(chroot.as_os_str()).expect("Should have chrooted");
+            }
+            if let Some(chdir) = self.chdir.take() {
+                nix::unistd::chdir(chdir.as_os_str()).expect("Should have changed directory");
             }
             // set up the environment
             if let Some(env) = self.env.take() {
