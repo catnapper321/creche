@@ -388,6 +388,8 @@ mod creche {
         // /dev/null file descriptor.
         fds_to_close: Vec<RawFd>,
         env: Option<Vec<CString>>,
+        chdir: Option<OsString>,
+        chroot: Option<OsString>,
     }
     impl ChildBuilder {
         pub fn new(path: impl Into<Vec<u8>>) -> Self {
@@ -399,6 +401,8 @@ mod creche {
                 devnull: None,
                 fds_to_close: Vec::new(),
                 env: None,
+                chdir: None,
+                chroot: None,
             }
         }
         pub fn arg(&mut self, arg: impl Into<Vec<u8>>) -> &mut Self {
@@ -424,6 +428,19 @@ mod creche {
             if self.env.is_none() {
                 self.env = Some(env);
             }
+            self
+        }
+        /// Child calls chroot after forking from the parent process. To
+        /// use this, the child must have CAP_SYS_CHROOT.
+        pub fn chroot(&mut self, path: impl Into<OsString>) -> &mut Self {
+            self.chroot = Some(path.into());
+            self
+        }
+        /// Child changes directory after forking from the parent process.
+        /// If a chroot has also been specified, the directory change will
+        /// happen after the chroot.
+        pub fn chdir(&mut self, path: impl Into<OsString>) -> &mut Self {
+            self.chdir = Some(path.into());
             self
         }
         /// Adds the fd to a list of file descriptors to close after the
