@@ -13,7 +13,7 @@
 pub const DEVNULL: &str = "/dev/null";
 
 // re-exports
-pub use creche::{Child, ChildBuilder};
+pub use creche::{Child, ChildBuilder, ChildHandle};
 pub use pipeline::{PipelineChildren, SimplePipelineBuilder};
 
 /// Types used to configure child process file descriptors. The values
@@ -334,11 +334,16 @@ pub mod ioconfig {
 mod creche {
     use super::*;
     use nix::unistd::{execvp, fork, ForkResult, Pid};
-    pub use nix::{errno::Errno, sys::wait::WaitStatus};
+    pub use nix::{
+        errno::Errno, 
+        sys::wait::WaitStatus,
+        sys::signal::Signal,
+    };
     use std::{
         ffi::{CString, OsString},
         fs::File,
         os::fd::{AsRawFd, OwnedFd, RawFd},
+        sync::{Arc, Weak},
     };
 
     /// Struct for configuration of a child process. File descriptors are
@@ -555,27 +560,96 @@ mod creche {
     /// Struct that represents a running or ended child process. Process
     /// exit status is available via `.wait()`.
     pub struct Child {
-        pid: Option<Pid>,
+        pid: Arc<Pid>,
     }
     impl Child {
         fn new(pid: Pid) -> Self {
-            Self { pid: Some(pid) }
+            Self { pid: Arc::new(pid) }
         }
         /// Returns the pid of the child process.
         pub fn pid(&self) -> Pid {
-            self.pid.unwrap()
+            self.pid.as_ref().clone()
         }
         /// Blocks until the child process has ended, and returns its exit
         /// status.
-        pub fn wait(mut self) -> Result<WaitStatus, Errno> {
-            let pid = self.pid.take().unwrap();
+        pub fn wait(self) -> Result<WaitStatus, Errno> {
+            let pid = self.pid.as_ref().clone();
             let exitstatus = {
                 let options = None;
                 nix::sys::wait::waitpid(pid, options)
             };
             exitstatus
         }
+        /// Returns a [`ChildHandle`] that may be use to send signals to
+        /// the the child process from another thread.
+        pub fn get_handle(&self) -> ChildHandle {
+            let pid_ref = Arc::downgrade(&self.pid);
+            ChildHandle::new(pid_ref)
+        }
     }
+
+    /// Holds a reference to a running child process that may be used to
+    /// send signals to it. Obtained by calling [`Child::get_handle()`].
+    /// Useful for sending signals to a child that is being waited on by
+    /// another thread.
+    ///
+    /// Example:
+    /// ```
+    /// // sleep for a few seconds
+    /// let mut cmd = ChildBuilder::new("sleep");
+    /// cmd.arg("6");
+    /// println!("sleeping for six seconds");
+    /// let child = cmd.spawn();
+    /// 
+    /// // get a "handle" to the child process so that we may signal it
+    /// let handle = child.get_handle();
+    /// 
+    /// // spawn a thread that will send SIGTERM, terminating it early
+    /// spawn( move || {
+    ///     sleep(Duration::from_secs(2));
+    ///     println!("sending SIGTERM from thread");
+    ///     _ = handle.terminate();
+    /// });
+    /// 
+    /// // collect the child exit status
+    /// println!("child exit: {:?}", child.wait());
+    /// ```
+    pub struct ChildHandle {
+        inner: Weak<Pid>,
+    }
+    impl ChildHandle {
+        fn new(inner: Weak<Pid>) -> Self {
+            Self { inner }
+        }
+        /// Sends the signal to the child process. Returns the raw error
+        /// number if the signal was not sent. If this method is called
+        /// after the originating [`Child`] is dropped, () will be
+        /// returned. 
+        pub fn kill(&self, signal: Signal) -> Result<(), Errno> {
+            if let Some(pid) = Weak::upgrade(&self.inner) {
+                nix::sys::signal::kill(*pid, signal) 
+            } else {
+                Ok(())
+            }
+        }
+        /// Convenience method for sending SIGTERM that drops `self`.
+        pub fn terminate(self) -> Result<(), Errno> {
+            self.kill(Signal::SIGTERM)
+        }
+        /// Sends SIGHUP to the child process.
+        pub fn hup(&self) -> Result<(), Errno> {
+            self.kill(Signal::SIGHUP)
+        }
+        /// Sends SIGUSR1 to the child process.
+        pub fn sigusr1(&self) -> Result<(), Errno> {
+            self.kill(Signal::SIGUSR1)
+        }
+        /// Sends SIGUSR2 to the child process.
+        pub fn sigusr2(&self) -> Result<(), Errno> {
+            self.kill(Signal::SIGUSR2)
+        }
+    }
+
 }
 
 /// Helpers for composing child processes into a pipeline. Constructing
