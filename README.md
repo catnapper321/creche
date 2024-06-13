@@ -121,3 +121,26 @@ let mut children = pipeline
 
 println!("{:?}", children.wait());
 ```
+
+Block on `.wait()`ing a child process and send a SIGTERM from another thread:
+
+```rust
+// sleep for a few seconds
+let mut cmd = ChildBuilder::new("sleep");
+cmd.arg("6");
+println!("sleeping for six seconds");
+let child = cmd.spawn();
+
+// get a "handle" to the child process so that we may signal it
+let handle = child.get_handle();
+
+// start a thread that sends SIGTERM after a short pause
+std::thread::spawn( move || {
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    println!("sending SIGTERM from thread");
+    _ = handle.terminate();
+});
+
+// collect the child exit status
+println!("child exit: {:?}", child.wait());
+```
