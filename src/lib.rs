@@ -558,7 +558,7 @@ mod creche {
     }
 
     /// Struct that represents a running or ended child process. Process
-    /// exit status is available via `.wait()`.
+    /// exit status is collected via `.wait()`.
     pub struct Child {
         pid: Arc<Pid>,
     }
