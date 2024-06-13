@@ -13,7 +13,7 @@
 pub const DEVNULL: &str = "/dev/null";
 
 // re-exports
-pub use creche::{Child, ChildBuilder, ChildHandle};
+pub use creche::{Child, ChildBuilder, ChildHandle, SignalError};
 pub use pipeline::{PipelineChildren, SimplePipelineBuilder};
 
 /// Types used to configure child process file descriptors. The values
@@ -588,6 +588,25 @@ mod creche {
         }
     }
 
+    #[derive(Debug)]
+    pub enum SignalError {
+        /// Error occurred sending the signal
+        Errno(Errno),
+        /// The [`Child`] has been dropped, presumably by [`Child::wait()`].
+        ChildDropped,
+    }
+    impl std::error::Error for SignalError {}
+    impl std::fmt::Display for SignalError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{self:?}")
+        }
+    }
+    impl From<Errno> for SignalError {
+        fn from(value: Errno) -> Self {
+            Self::Errno(value)
+        }
+    }
+
     /// Holds a reference to a running child process that may be used to
     /// send signals to it. Obtained by calling [`Child::get_handle()`].
     /// Useful for sending signals to a child that is being waited on by
@@ -623,29 +642,30 @@ mod creche {
         }
         /// Sends the signal to the child process. Returns the raw error
         /// number if the signal was not sent. If this method is called
-        /// after the originating [`Child`] is dropped, () will be
-        /// returned. 
-        pub fn kill(&self, signal: Signal) -> Result<(), Errno> {
+        /// after the originating [`Child`] is dropped,
+        /// `Err(SignalError::ChildDropped)` will be returned. 
+        pub fn kill(&self, signal: Signal) -> Result<(), SignalError> {
             if let Some(pid) = Weak::upgrade(&self.inner) {
-                nix::sys::signal::kill(*pid, signal) 
-            } else {
+                nix::sys::signal::kill(*pid, signal)?;
                 Ok(())
+            } else {
+                Err(SignalError::ChildDropped)
             }
         }
         /// Convenience method for sending SIGTERM that drops `self`.
-        pub fn terminate(self) -> Result<(), Errno> {
+        pub fn terminate(self) -> Result<(), SignalError> {
             self.kill(Signal::SIGTERM)
         }
         /// Sends SIGHUP to the child process.
-        pub fn hup(&self) -> Result<(), Errno> {
+        pub fn hup(&self) -> Result<(), SignalError> {
             self.kill(Signal::SIGHUP)
         }
         /// Sends SIGUSR1 to the child process.
-        pub fn sigusr1(&self) -> Result<(), Errno> {
+        pub fn sigusr1(&self) -> Result<(), SignalError> {
             self.kill(Signal::SIGUSR1)
         }
         /// Sends SIGUSR2 to the child process.
-        pub fn sigusr2(&self) -> Result<(), Errno> {
+        pub fn sigusr2(&self) -> Result<(), SignalError> {
             self.kill(Signal::SIGUSR2)
         }
     }
