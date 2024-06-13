@@ -26,7 +26,7 @@ Add this to the dependencies in `Cargo.toml`:
 ```rust
 creche = "0.1"
 ```
-The [`ChildBuilder`] and [`SimplePipelineBuilder`] types are top level exports, so many common use cases are enabled with a simple `use`:
+The `ChildBuilder` and `SimplePipelineBuilder` types are top level exports, so many common use cases are enabled with a simple `use`:
 
 ```rust
 use creche::*;
