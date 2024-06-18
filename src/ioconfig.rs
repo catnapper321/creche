@@ -1,6 +1,3 @@
-/// Types used to configure child process file descriptors. The values
-/// obtained via the functions in this module are used with
-/// [`ChildBuilder::config_io()`].
 use super::*;
 use nix::{
     fcntl::OFlag,

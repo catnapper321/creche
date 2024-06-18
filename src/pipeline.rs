@@ -1,8 +1,3 @@
-/// Helpers for composing child processes into a pipeline. Constructing
-/// pipelines manually is tedious and error prone.
-/// [`SimplePipelineBuilder`] will handle piping stdout -> stdin between
-/// processes and spawn everything in a simpler way than manually
-/// configuring pipes. See [`ioconfig::interprocess_pipe()`].
 use crate::*;
 use ioconfig::{interprocess_pipe, InterprocessPipeRead};
 use nix::sys::wait::WaitStatus;

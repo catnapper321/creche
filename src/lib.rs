@@ -13,8 +13,17 @@
 pub const DEVNULL: &str = "/dev/null";
 
 mod creche;
+/// Types for manipulating the environment variables of a child process
 pub mod envconfig;
+/// Types used to configure child process file descriptors. The values
+/// obtained via the functions in this module are used with
+/// [`ChildBuilder::config_io()`].
 pub mod ioconfig;
+/// Helpers for composing child processes into a pipeline. Constructing
+/// pipelines manually is tedious and error prone.
+/// [`SimplePipelineBuilder`] will handle piping stdout -> stdin between
+/// processes and spawn everything in a simpler way than manually
+/// configuring pipes. See [`ioconfig::interprocess_pipe()`].
 pub mod pipeline;
 mod utils;
 
