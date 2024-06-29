@@ -1,5 +1,6 @@
 /// Configure child processes
 use super::*;
+use utils::Argument;
 use nix::unistd::{execvp, fork, ForkResult, Pid};
 pub use nix::{errno::Errno, sys::signal::Signal, sys::wait::WaitStatus};
 use std::{
