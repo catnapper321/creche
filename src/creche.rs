@@ -62,9 +62,9 @@ pub struct ChildBuilder {
 }
 impl ChildBuilder {
     pub fn new(path: impl Into<Argument>) -> Self {
-        let p = path.into();
+        let p: Argument = path.into();
         Self {
-            bin: p.clone(),
+            bin: p.clone().into_value(),
             args: vec![p.into_value()], // first arg is always the executable name
             io_configs: Vec::new(),
             devnull: None,
