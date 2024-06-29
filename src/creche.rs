@@ -60,11 +60,11 @@ pub struct ChildBuilder {
     chroot: Option<OsString>,
 }
 impl ChildBuilder {
-    pub fn new(path: impl Into<Vec<u8>>) -> Self {
-        let p = CString::new(path.into()).unwrap();
+    pub fn new(path: impl Into<Argument>) -> Self {
+        let p = path.into();
         Self {
             bin: p.clone(),
-            args: vec![p], // first arg is always the executable name
+            args: vec![p.into_value()], // first arg is always the executable name
             io_configs: Vec::new(),
             devnull: None,
             fds_to_close: Vec::new(),
@@ -73,9 +73,9 @@ impl ChildBuilder {
             chroot: None,
         }
     }
-    pub fn arg(&mut self, arg: impl Into<Vec<u8>>) -> &mut Self {
-        let x = CString::new(arg).unwrap();
-        self.args.push(x);
+    pub fn arg(&mut self, arg: impl Into<Argument>) -> &mut Self {
+        let x = arg.into();
+        self.args.push(x.into_value());
         self
     }
     /// Accepts an [`ioconfig::IOConfig`] (a boxed trait object) that configures the file descriptors of the child process.

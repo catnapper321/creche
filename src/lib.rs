@@ -30,3 +30,6 @@ mod utils;
 // re-exports
 pub use creche::{Child, ChildBuilder, ChildHandle, SignalError};
 pub use pipeline::{PipelineChildren, SimplePipelineBuilder};
+pub use utils::Argument;
+pub use nix::errno::Errno;
+pub use nix::sys::wait::WaitStatus;
