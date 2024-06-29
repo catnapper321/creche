@@ -8,6 +8,7 @@ use std::{
     fs::File,
     os::fd::{AsRawFd, OwnedFd, RawFd},
     sync::{Arc, Weak},
+    ops::Deref,
 };
 
 /// Struct for configuration of a child process. File descriptors are
@@ -64,8 +65,8 @@ impl ChildBuilder {
     pub fn new(path: impl Into<Argument>) -> Self {
         let p: Argument = path.into();
         Self {
-            bin: p.clone().into_value(),
-            args: vec![p.into_value()], // first arg is always the executable name
+            bin: p.deref().to_owned(),
+            args: vec![p.into_c_string()], // first arg is always the executable name
             io_configs: Vec::new(),
             devnull: None,
             fds_to_close: Vec::new(),
@@ -76,7 +77,7 @@ impl ChildBuilder {
     }
     pub fn arg(&mut self, arg: impl Into<Argument>) -> &mut Self {
         let x = arg.into();
-        self.args.push(x.into_value());
+        self.args.push(x.into_c_string());
         self
     }
     /// Accepts an [`ioconfig::IOConfig`] (a boxed trait object) that configures the file descriptors of the child process.

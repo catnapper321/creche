@@ -58,13 +58,31 @@ impl Argument {
         let cstring = CString::new(value.into())?;
         Ok(Self(cstring))
     }
-    pub fn into_value(self) -> CString {
+    pub fn into_c_string(self) -> CString {
         self.0
     }
     pub fn into_pathbuf(self) -> PathBuf {
         let bytes = self.0.into_bytes();
         let os_string = unsafe { OsString::from_encoded_bytes_unchecked(bytes) };
         PathBuf::from(os_string)
+    }
+    pub fn into_os_string(self) -> OsString {
+        let bytes = self.0.into_bytes();
+        unsafe { OsString::from_encoded_bytes_unchecked(bytes) }
+    }
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+    pub fn as_os_str(&self) -> &OsStr {
+        let bytes = self.as_bytes();
+        unsafe { OsStr::from_encoded_bytes_unchecked(bytes) }
+    }
+    pub fn as_path(&self) -> &Path {
+        let x = self.as_os_str();
+        Path::new(x)
     }
 }
 
