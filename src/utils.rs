@@ -45,11 +45,13 @@ impl<T, I: Iterator<Item = T>> Iterator for HeadBodyTailIter<T, I> {
 }
 
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
-use std::ffi::{CStr, CString};
+use std::ffi::{CStr, CString, OsString, OsStr};
+use std::path::{Path, PathBuf};
 
 /// Helper type for dealing with different ways to represent child process
-/// arguments. Internally, [`ChildBuilder`] operates on CStrings.
-pub struct Argument(pub CString);
+/// arguments. Internally, [`ChildBuilder`] operates on `CStrings`.
+#[derive(Debug, Clone)]
+pub struct Argument(CString);
 
 impl Argument {
     pub fn new(value: impl Into<Vec<u8>>) -> Result<Self, std::ffi::NulError> {
@@ -59,18 +61,26 @@ impl Argument {
     pub fn into_value(self) -> CString {
         self.0
     }
+    pub fn into_pathbuf(self) -> PathBuf {
+        let bytes = self.0.into_bytes();
+        let os_string = unsafe { OsString::from_encoded_bytes_unchecked(bytes) };
+        PathBuf::from(os_string)
+    }
 }
 
 impl std::ops::Deref for Argument {
-    type Target = CString;
+    type Target = CStr;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
-impl std::ops::DerefMut for Argument {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+
+impl TryFrom<&[u8]> for Argument {
+    type Error = std::ffi::NulError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -84,6 +94,12 @@ impl From<&std::path::Path> for Argument {
 impl From<std::path::PathBuf> for Argument {
     fn from(value: std::path::PathBuf) -> Self {
         value.as_path().into()
+    }
+}
+
+impl From<&std::path::PathBuf> for Argument {
+    fn from(value: &std::path::PathBuf) -> Self {
+        value.into()
     }
 }
 
@@ -113,6 +129,12 @@ impl From<String> for Argument {
     }
 }
 
+impl From<&String> for Argument {
+    fn from(value: &String) -> Self {
+        value.into()
+    }
+}
+
 impl From<&CStr> for Argument {
     fn from(value: &CStr) -> Self {
         Self(value.to_owned())
@@ -122,5 +144,11 @@ impl From<&CStr> for Argument {
 impl From<CString> for Argument {
     fn from(value: CString) -> Self {
         Self(value)
+    }
+}
+
+impl From<&CString> for Argument {
+    fn from(value: &CString) -> Self {
+        value.into()
     }
 }
