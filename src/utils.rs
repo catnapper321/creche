@@ -48,8 +48,15 @@ use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::ffi::{CStr, CString, OsString, OsStr};
 use std::path::{Path, PathBuf};
 
+use super::ChildBuilder;
 /// Helper type for dealing with different ways to represent child process
-/// arguments. Internally, [`ChildBuilder`] operates on `CStrings`.
+/// arguments.
+///
+/// The `Argument` type converts several other types into the `CStrings`
+/// that [`ChildBuilder`] uses internally. Due to [`ChildBuilder::new()`]
+/// and [`ChildBuilder::arg()`] taking an `impl Into<Argument>`, these
+/// methods will accept `String`s, `PathBuf`s, `OsString`s, and related
+/// types and handle the conversion automatically.
 #[derive(Debug, Clone)]
 pub struct Argument(CString);
 
@@ -83,6 +90,20 @@ impl Argument {
     pub fn as_path(&self) -> &Path {
         let x = self.as_os_str();
         Path::new(x)
+    }
+    /// Convenience method for cloning the inner value as a `CString`.
+    pub fn clone_c_string(&self) -> CString {
+        self.0.clone()
+    }
+    /// Convenience method for cloning the inner value as an `OsString`.
+    pub fn clone_os_string(&self) -> OsString {
+        let bytes = self.0.as_bytes().to_vec();
+        unsafe { OsString::from_encoded_bytes_unchecked(bytes) }
+    }
+    /// Convenience method for cloning the inner value as a `PathBuf`.
+    pub fn clone_pathbuf(&self) -> PathBuf {
+        let os_string = self.clone_os_string();
+        PathBuf::from(os_string)
     }
 }
 
