@@ -1,15 +1,15 @@
 /// Configure child processes
 use super::*;
-use utils::Argument;
 use nix::unistd::{execvp, fork, ForkResult, Pid};
 pub use nix::{errno::Errno, sys::signal::Signal, sys::wait::WaitStatus};
 use std::{
     ffi::{CString, OsString},
     fs::File,
+    ops::Deref,
     os::fd::{AsRawFd, OwnedFd, RawFd},
     sync::{Arc, Weak},
-    ops::Deref,
 };
+use utils::Argument;
 
 /// Struct for configuration of a child process. File descriptors are
 /// configured by calling [`Self::config_io()`] with values obtained

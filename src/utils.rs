@@ -44,8 +44,8 @@ impl<T, I: Iterator<Item = T>> Iterator for HeadBodyTailIter<T, I> {
     }
 }
 
+use std::ffi::{CStr, CString, OsStr, OsString};
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
-use std::ffi::{CStr, CString, OsString, OsStr};
 use std::path::{Path, PathBuf};
 
 use super::ChildBuilder;
