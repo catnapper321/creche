@@ -21,16 +21,16 @@ Creche is an alternative to `Command` and friends in the standard library.
 
 ## How to Use
 
-Add this to the dependencies in `Cargo.toml`:
-
-```rust
-creche = "0.1"
-```
-The `ChildBuilder` and `SimplePipelineBuilder` types are top level exports, so many common use cases are enabled with a simple `use`:
+The `ChildBuilder` and `SimplePipelineBuilder` types are top level
+exports, so many common use cases are enabled with a simple `use`:
 
 ```rust
 use creche::*;
 ```
+
+Read the
+[changelog](https://github.com/catnapper321/creche/blob/main/CHANGELOG.md)
+for a description of breaking changes to the API.
 
 ## Examples
 
