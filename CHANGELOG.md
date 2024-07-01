@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+Bugfix release: Conversion from ref types to Argument could overflow the stack
+
 ## 0.2.0
 
 The `ChildBuilder::new` and `ChildBuilder::arg` methods now take a
