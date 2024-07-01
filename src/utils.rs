@@ -138,7 +138,7 @@ impl From<std::path::PathBuf> for Argument {
 
 impl From<&std::path::PathBuf> for Argument {
     fn from(value: &std::path::PathBuf) -> Self {
-        value.into()
+        From::from(value.clone())
     }
 }
 
@@ -164,13 +164,14 @@ impl From<&str> for Argument {
 
 impl From<String> for Argument {
     fn from(value: String) -> Self {
-        value.as_str().into()
+        let x: Vec<u8> = value.as_bytes().into();
+        Self(CString::new(x).unwrap())
     }
 }
 
 impl From<&String> for Argument {
     fn from(value: &String) -> Self {
-        value.into()
+        From::from(value.clone())
     }
 }
 
@@ -188,6 +189,6 @@ impl From<CString> for Argument {
 
 impl From<&CString> for Argument {
     fn from(value: &CString) -> Self {
-        value.into()
+        From::from(value.clone())
     }
 }
