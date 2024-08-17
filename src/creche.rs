@@ -318,7 +318,7 @@ impl ChildHandle {
         }
     }
     /// Convenience method for sending SIGTERM that drops `self`.
-    pub fn terminate(self) -> Result<(), SignalError> {
+    pub fn terminate(&self) -> Result<(), SignalError> {
         self.kill(Signal::SIGTERM)
     }
     /// Sends SIGHUP to the child process.
