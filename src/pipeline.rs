@@ -21,23 +21,24 @@ use utils::*;
 ///
 /// Example:
 /// ```
-///    let mut ls_cmd = ChildBuilder::new("ls");
-///    ls_cmd.arg("-1");
-///    let mut sort_cmd = ChildBuilder::new("sort");
-///    sort_cmd.arg("-r");
-///    let mut tr_cmd = ChildBuilder::new("tr");
-///    tr_cmd.arg("[:lower:]");
-///    tr_cmd.arg("[:upper:]");
+/// # use creche::*;
+/// let mut ls_cmd = ChildBuilder::new("ls");
+/// ls_cmd.arg("-1");
+/// let mut sort_cmd = ChildBuilder::new("sort");
+/// sort_cmd.arg("-r");
+/// let mut tr_cmd = ChildBuilder::new("tr");
+/// tr_cmd.arg("[:lower:]");
+/// tr_cmd.arg("[:upper:]");
 ///
-///    let mut pipeline = SimplePipelineBuilder::new();
-///    let mut children = pipeline
-///        .add_builder(ls_cmd)
-///        .add_builder(sort_cmd)
-///        .add_builder(tr_cmd)
-///        .quiet()
-///        .spawn();
+/// let mut pipeline = SimplePipelineBuilder::new();
+/// let mut children = pipeline
+///     .add_builder(ls_cmd)
+///     .add_builder(sort_cmd)
+///     .add_builder(tr_cmd)
+///     .quiet()
+///     .spawn();
 ///
-///    println!("{:?}", children.wait());
+/// println!("{:?}", children.wait());
 /// ```
 #[derive(Default)]
 pub struct SimplePipelineBuilder {

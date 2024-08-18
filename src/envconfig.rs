@@ -75,6 +75,7 @@ impl Inherit {
 ///
 /// Example:
 /// ```
+/// # use creche::*;
 /// // configure the environment
 /// let mut env = envconfig::EnvironmentBuilder::new();
 /// env.keep("HOME").keep("PATH").set("server_port", "1234");

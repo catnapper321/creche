@@ -170,6 +170,8 @@ impl PipeToChild {
 ///
 /// Example:
 /// ```
+/// # use creche::*;
+/// # use std::io::Write;
 /// // create a pipe that will connect stdout from a child process to stdin
 /// // of another child process.
 /// let (mut r, mut w) = ioconfig::interprocess_pipe(0, 1);
@@ -252,6 +254,8 @@ impl ConfigureIO for InterprocessPipeRead {
 ///
 /// Example redirect stderr to a log file:
 /// ```
+/// # use creche::*;
+/// # fn example() -> std::io::Result<()> {
 /// // set up log file
 /// let mut f_opts = std::fs::File::options();
 /// f_opts.write(true).read(false).create(true);
@@ -265,10 +269,13 @@ impl ConfigureIO for InterprocessPipeRead {
 ///
 /// let mut child = cmd.spawn();
 /// println!("{:?}", child.wait());
+/// # Ok(()) }
 /// ```
 ///
 /// Example redirect from a file to stdin of a child process:
 /// ```
+/// # use creche::*;
+/// # fn example() -> std::io::Result<()> {
 /// // set up the file to read from
 /// let mut f_opts = std::fs::File::options();
 /// f_opts.read(true).write(false);
@@ -280,6 +287,7 @@ impl ConfigureIO for InterprocessPipeRead {
 ///
 /// let mut child = cmd.spawn();
 /// println!("{:?}", child.wait());
+/// # Ok(()) }
 /// ```
 
 pub struct RedirectToFd {

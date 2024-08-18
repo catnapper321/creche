@@ -19,6 +19,8 @@ use utils::Argument;
 ///
 /// Example of piping data to a child process:
 /// ```
+/// # use creche::*;
+/// # use std::io::Write;
 /// let mut cmd = creche::ChildBuilder::new("tr");
 /// cmd.arg("[:lower:]").arg("[:upper:]");
 /// let fd = cmd.pipe_to_stdin();
@@ -33,6 +35,8 @@ use utils::Argument;
 /// ```
 /// Example of reading data from a child process:
 /// ```
+/// # use creche::*;
+/// # fn example() -> Result<(), std::io::Error> {
 /// // configure the child process
 /// let mut cmd = ChildBuilder::new("ls");
 /// let pipe = cmd.pipe_from_stdout();
@@ -47,6 +51,8 @@ use utils::Argument;
 ///
 /// println!("output is: {:?}", output);
 /// println!("exit status: {:?}", child.wait());
+/// # Ok(())
+/// # }
 /// ```
 pub struct ChildBuilder {
     bin: CString,
@@ -279,7 +285,11 @@ impl From<Errno> for SignalError {
 ///
 /// Example:
 /// ```
+/// # use creche::*;
+/// # use std::thread::{sleep, spawn};
+/// # use std::time::Duration;
 /// // sleep for a few seconds
+/// # use creche::*;
 /// let mut cmd = ChildBuilder::new("sleep");
 /// cmd.arg("6");
 /// println!("sleeping for six seconds");
