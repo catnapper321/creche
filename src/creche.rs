@@ -1,7 +1,9 @@
+#![allow(unused)]
 /// Configure child processes
 use super::*;
-use nix::unistd::{execvp, fork, ForkResult, Pid};
-pub use nix::{errno::Errno, sys::signal::Signal, sys::wait::WaitStatus};
+use pidfd::*;
+// use nix::unistd::{execvp, fork, ForkResult, Pid};
+// pub use nix::{errno::Errno, sys::signal::Signal, sys::wait::WaitStatus};
 use std::{
     ffi::{CString, OsString},
     fs::File,
@@ -131,24 +133,24 @@ impl ChildBuilder {
     }
     /// Creates a pipe. The read end gets connected to the child
     /// process stdin, and the write end is returned as an OwnedFd.
-    pub fn pipe_to_stdin(&mut self) -> OwnedFd {
-        let (fd, io_config) = ioconfig::PipeToChild::new(0);
+    pub fn pipe_to_stdin(&mut self) -> CrecheResult<OwnedFd> {
+        let (fd, io_config) = ioconfig::PipeToChild::new(0)?;
         self.io_configs.push(io_config);
-        fd
+        Ok(fd)
     }
     /// Creates a pipe. The write end gets connected to the child
     /// process stdout, and the read end is returned as an OwnedFd.
-    pub fn pipe_from_stdout(&mut self) -> OwnedFd {
-        let (fd, io_config) = ioconfig::PipeFromChild::new(1);
+    pub fn pipe_from_stdout(&mut self) -> CrecheResult<OwnedFd> {
+        let (fd, io_config) = ioconfig::PipeFromChild::new(1)?;
         self.io_configs.push(io_config);
-        fd
+        Ok(fd)
     }
     /// Creates a pipe. The write end gets connected to the child
     /// process stderr, and the read end is returned as an OwnedFd.
-    pub fn pipe_from_stderr(&mut self) -> OwnedFd {
-        let (fd, io_config) = ioconfig::PipeFromChild::new(2);
+    pub fn pipe_from_stderr(&mut self) -> CrecheResult<OwnedFd> {
+        let (fd, io_config) = ioconfig::PipeFromChild::new(2)?;
         self.io_configs.push(io_config);
-        fd
+        Ok(fd)
     }
     /// Redirects stderr to stdout. Equivalent to `2>&1` in a shell
     /// script.
@@ -188,30 +190,31 @@ impl ChildBuilder {
 
     /// Forks and execs a child process, returning a [`Child`] value.
     /// Use [`Child::wait()`] to collect the process exit status.
-    pub fn spawn(mut self) -> Child {
+    pub fn spawn(mut self) -> CrecheResult<Pidfd> {
         // sort the io configs in priority order
         self.io_configs
             .sort_by(|b, a| a.priority().cmp(&b.priority()));
-        let fork_result = unsafe { fork() }.expect("Should have forked");
-        if let ForkResult::Parent { child, .. } = fork_result {
+        if let Some(pidfd) = clone_process()? {
             // run parent process post fork hooks
             self.io_configs
                 .iter_mut()
                 .for_each(|x| x.parent_post_fork());
-            return Child::new(child);
+            return Ok(pidfd);
         }
+        // Child process only
         // run child process post fork hooks
         self.io_configs.iter().for_each(|x| x.child_post_fork());
-        // close the specified fds
+        // close the specified fds, ignoring errors
         for fd in self.fds_to_close.iter() {
-            _ = nix::unistd::close(*fd);
+            unsafe { libc::close(*fd); }
         }
-        if let Some(chroot) = self.chroot.take() {
-            nix::unistd::chroot(chroot.as_os_str()).expect("Should have chrooted");
-        }
-        if let Some(chdir) = self.chdir.take() {
-            nix::unistd::chdir(chdir.as_os_str()).expect("Should have changed directory");
-        }
+        // TODO: chroot and chdir
+        // if let Some(chroot) = self.chroot.take() {
+        //     nix::unistd::chroot(chroot.as_os_str()).expect("Should have chrooted");
+        // }
+        // if let Some(chdir) = self.chdir.take() {
+        //     nix::unistd::chdir(chdir.as_os_str()).expect("Should have changed directory");
+        // }
         // set up the environment
         if let Some(env) = self.env.take() {
             self.exec_with_env(&env);
@@ -221,126 +224,128 @@ impl ChildBuilder {
         unreachable!()
     }
     pub fn exec(self) {
-        _ = nix::unistd::execvp(&self.bin, self.args.as_slice());
+        // TODO: exec
+        // _ = nix::unistd::execvp(&self.bin, self.args.as_slice());
     }
     pub fn exec_with_env(self, env: &[CString]) {
-        _ = nix::unistd::execvpe(&self.bin, self.args.as_slice(), &env);
+        // TODO:
+        // _ = nix::unistd::execvpe(&self.bin, self.args.as_slice(), &env);
     }
 }
 
-/// Struct that represents a running or ended child process. Process
-/// exit status is collected via `.wait()`.
-pub struct Child {
-    pid: Arc<Pid>,
-}
-impl Child {
-    fn new(pid: Pid) -> Self {
-        Self { pid: Arc::new(pid) }
-    }
-    /// Returns the pid of the child process.
-    pub fn pid(&self) -> Pid {
-        self.pid.as_ref().clone()
-    }
-    /// Blocks until the child process has ended, and returns its exit
-    /// status.
-    pub fn wait(self) -> Result<WaitStatus, Errno> {
-        let pid = self.pid.as_ref().clone();
-        let exitstatus = {
-            let options = None;
-            nix::sys::wait::waitpid(pid, options)
-        };
-        exitstatus
-    }
-    /// Returns a [`ChildHandle`] that may be use to send signals to
-    /// the the child process from another thread.
-    pub fn get_handle(&self) -> ChildHandle {
-        let pid_ref = Arc::downgrade(&self.pid);
-        ChildHandle::new(pid_ref)
-    }
-}
+// /// Struct that represents a running or ended child process. Process
+// /// exit status is collected via `.wait()`.
+// pub struct Child {
+//     pid: Arc<Pid>,
+// }
+// impl Child {
+//     fn new(pid: Pid) -> Self {
+//         Self { pid: Arc::new(pid) }
+//     }
+//     /// Returns the pid of the child process.
+//     pub fn pid(&self) -> Pid {
+//         self.pid.as_ref().clone()
+//     }
+//     /// Blocks until the child process has ended, and returns its exit
+//     /// status.
+//     pub fn wait(self) -> Result<WaitStatus, Errno> {
+//         let pid = self.pid.as_ref().clone();
+//         let exitstatus = {
+//             let options = None;
+//             nix::sys::wait::waitpid(pid, options)
+//         };
+//         exitstatus
+//     }
+//     /// Returns a [`ChildHandle`] that may be use to send signals to
+//     /// the the child process from another thread.
+//     pub fn get_handle(&self) -> ChildHandle {
+//         let pid_ref = Arc::downgrade(&self.pid);
+//         ChildHandle::new(pid_ref)
+//     }
+// }
 
-#[derive(Debug)]
-pub enum SignalError {
-    /// Error occurred sending the signal
-    Errno(Errno),
-    /// The [`Child`] has been dropped, presumably by [`Child::wait()`].
-    ChildDropped,
-}
-impl std::error::Error for SignalError {}
-impl std::fmt::Display for SignalError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-impl From<Errno> for SignalError {
-    fn from(value: Errno) -> Self {
-        Self::Errno(value)
-    }
-}
+// #[derive(Debug)]
+// pub enum SignalError {
+//     /// Error occurred sending the signal
+//     Errno(Errno),
+//     /// The [`Child`] has been dropped, presumably by [`Child::wait()`].
+//     ChildDropped,
+// }
+// impl std::error::Error for SignalError {}
+// impl std::fmt::Display for SignalError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{self:?}")
+//     }
+// }
+// impl From<Errno> for SignalError {
+//     fn from(value: Errno) -> Self {
+//         Self::Errno(value)
+//     }
+// }
 
-/// Holds a reference to a running child process that may be used to
-/// send signals to it. Obtained by calling [`Child::get_handle()`].
-/// Useful for sending signals to a child that is being waited on by
-/// another thread.
-///
-/// Example:
-/// ```
-/// # use creche::*;
-/// # use std::thread::{sleep, spawn};
-/// # use std::time::Duration;
-/// // sleep for a few seconds
-/// # use creche::*;
-/// let mut cmd = ChildBuilder::new("sleep");
-/// cmd.arg("6");
-/// println!("sleeping for six seconds");
-/// let child = cmd.spawn();
-///
-/// // get a "handle" to the child process so that we may signal it
-/// let handle = child.get_handle();
-///
-/// // spawn a thread that will send SIGTERM, terminating it early
-/// spawn( move || {
-///     sleep(Duration::from_secs(2));
-///     println!("sending SIGTERM from thread");
-///     _ = handle.terminate();
-/// });
-///
-/// // collect the child exit status
-/// println!("child exit: {:?}", child.wait());
-/// ```
-pub struct ChildHandle {
-    inner: Weak<Pid>,
-}
-impl ChildHandle {
-    fn new(inner: Weak<Pid>) -> Self {
-        Self { inner }
-    }
-    /// Sends the signal to the child process. Returns the raw error
-    /// number if the signal was not sent. If this method is called
-    /// after the originating [`Child`] is dropped,
-    /// `Err(SignalError::ChildDropped)` will be returned.
-    pub fn kill(&self, signal: Signal) -> Result<(), SignalError> {
-        if let Some(pid) = Weak::upgrade(&self.inner) {
-            nix::sys::signal::kill(*pid, signal)?;
-            Ok(())
-        } else {
-            Err(SignalError::ChildDropped)
-        }
-    }
-    /// Convenience method for sending SIGTERM that drops `self`.
-    pub fn terminate(&self) -> Result<(), SignalError> {
-        self.kill(Signal::SIGTERM)
-    }
-    /// Sends SIGHUP to the child process.
-    pub fn hup(&self) -> Result<(), SignalError> {
-        self.kill(Signal::SIGHUP)
-    }
-    /// Sends SIGUSR1 to the child process.
-    pub fn sigusr1(&self) -> Result<(), SignalError> {
-        self.kill(Signal::SIGUSR1)
-    }
-    /// Sends SIGUSR2 to the child process.
-    pub fn sigusr2(&self) -> Result<(), SignalError> {
-        self.kill(Signal::SIGUSR2)
-    }
-}
+// /// Holds a reference to a running child process that may be used to
+// /// send signals to it. Obtained by calling [`Child::get_handle()`].
+// /// Useful for sending signals to a child that is being waited on by
+// /// another thread.
+// ///
+// /// Example:
+// /// ```
+// /// # use creche::*;
+// /// # use std::thread::{sleep, spawn};
+// /// # use std::time::Duration;
+// /// // sleep for a few seconds
+// /// # use creche::*;
+// /// let mut cmd = ChildBuilder::new("sleep");
+// /// cmd.arg("6");
+// /// println!("sleeping for six seconds");
+// /// let child = cmd.spawn();
+// ///
+// /// // get a "handle" to the child process so that we may signal it
+// /// let handle = child.get_handle();
+// ///
+// /// // spawn a thread that will send SIGTERM, terminating it early
+// /// spawn( move || {
+// ///     sleep(Duration::from_secs(2));
+// ///     println!("sending SIGTERM from thread");
+// ///     _ = handle.terminate();
+// /// });
+// ///
+// /// // collect the child exit status
+// /// println!("child exit: {:?}", child.wait());
+// /// ```
+// pub struct ChildHandle {
+//     inner: Weak<Pid>,
+// }
+// impl ChildHandle {
+//     fn new(inner: Weak<Pid>) -> Self {
+//         Self { inner }
+//     }
+//     /// Sends the signal to the child process. Returns the raw error
+//     /// number if the signal was not sent. If this method is called
+//     /// after the originating [`Child`] is dropped,
+//     /// `Err(SignalError::ChildDropped)` will be returned.
+//     pub fn kill(&self, signal: Signal) -> Result<(), SignalError> {
+//         if let Some(pid) = Weak::upgrade(&self.inner) {
+//             nix::sys::signal::kill(*pid, signal)?;
+//             Ok(())
+//         } else {
+//             Err(SignalError::ChildDropped)
+//         }
+//     }
+//     /// Convenience method for sending SIGTERM that drops `self`.
+//     pub fn terminate(&self) -> Result<(), SignalError> {
+//         self.kill(Signal::SIGTERM)
+//     }
+//     /// Sends SIGHUP to the child process.
+//     pub fn hup(&self) -> Result<(), SignalError> {
+//         self.kill(Signal::SIGHUP)
+//     }
+//     /// Sends SIGUSR1 to the child process.
+//     pub fn sigusr1(&self) -> Result<(), SignalError> {
+//         self.kill(Signal::SIGUSR1)
+//     }
+//     /// Sends SIGUSR2 to the child process.
+//     pub fn sigusr2(&self) -> Result<(), SignalError> {
+//         self.kill(Signal::SIGUSR2)
+//     }
+// }

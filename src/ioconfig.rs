@@ -1,17 +1,16 @@
-use super::*;
-use nix::{
-    fcntl::OFlag,
-    unistd::{dup2, pipe2},
-};
-use std::os::fd::{AsRawFd, OwnedFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
+use super::pipe::*;
+use super::error::*;
 
 pub type IOConfig = Box<dyn ConfigureIO>;
 
 // returns (read_end_fd, write_end_fd) of a pipe with CLOEXEC flag set
-fn cloexec_pipe() -> (OwnedFd, OwnedFd) {
-    let mut flags = OFlag::empty();
-    flags.set(OFlag::O_CLOEXEC, true);
-    pipe2(flags).expect("Should have created a new pipe")
+fn cloexec_pipe() -> CrecheResult<(OwnedFd, OwnedFd)> {
+    let (r, w) = make_pipe(O::CLOEXEC)?;
+    unsafe {
+        Ok((OwnedFd::from_raw_fd(r), OwnedFd::from_raw_fd(w)))
+
+    }
 }
 
 pub trait ConfigureIO {
@@ -44,7 +43,9 @@ pub struct Redirect {
 }
 impl ConfigureIO for Redirect {
     fn child_post_fork(&self) {
-        _ = dup2(self.to_fd, self.from_fd);
+        unsafe { 
+            libc::dup2(self.to_fd, self.from_fd);
+        }
     }
     fn parent_post_fork(&mut self) {}
     fn priority(&self) -> i32 {
@@ -92,7 +93,9 @@ impl ConfigureIO for PipeFromChild {
             .map(|x| x.as_raw_fd())
             .expect("Should have an OwnedFd for write end of pipe");
         // redirect the child_fd to the write end of the pipe
-        _ = dup2(write_fd, self.child_fd);
+        unsafe {
+            libc::dup2(write_fd, self.child_fd);
+        }
     }
 
     fn parent_post_fork(&mut self) {
@@ -107,15 +110,15 @@ impl PipeFromChild {
     /// [`ChildBuilder::config_io()`]
     ///
     /// Panics if a new pipe cannot be created.
-    pub fn new(child_fd: RawFd) -> (OwnedFd, IOConfig) {
-        let (pipe_r, pipe_w) = cloexec_pipe();
-        (
+    pub fn new(child_fd: RawFd) -> CrecheResult<(OwnedFd, IOConfig)> {
+        let (pipe_r, pipe_w) = cloexec_pipe()?;
+        Ok((
             pipe_r,
             Box::new(Self {
                 child_fd,
                 pipe_w: Some(pipe_w),
             }),
-        )
+        ))
     }
 }
 
@@ -137,7 +140,9 @@ impl ConfigureIO for PipeToChild {
             .map(|x| x.as_raw_fd())
             .expect("Should have an OwnedFd for read end of pipe");
         // redirect the child_fd to the read end of the pipe
-        _ = dup2(read_fd, self.child_fd);
+        unsafe {
+            libc::dup2(read_fd, self.child_fd);
+        }
     }
 
     fn parent_post_fork(&mut self) {
@@ -152,15 +157,15 @@ impl PipeToChild {
     /// [`ChildBuilder::config_io()`]
     ///
     /// Panics if a new pipe cannot be created.
-    pub fn new(child_fd: RawFd) -> (OwnedFd, IOConfig) {
-        let (pipe_r, pipe_w) = cloexec_pipe();
-        (
+    pub fn new(child_fd: RawFd) -> CrecheResult<(OwnedFd, IOConfig)> {
+        let (pipe_r, pipe_w) = cloexec_pipe()?;
+        Ok((
             pipe_w,
             Box::new(Self {
                 child_fd,
                 pipe_r: Some(pipe_r),
             }),
-        )
+        ))
     }
 }
 
@@ -203,9 +208,9 @@ impl PipeToChild {
 pub fn interprocess_pipe(
     read_fd: RawFd,
     write_fd: RawFd,
-) -> (Box<InterprocessPipeRead>, Box<InterprocessPipeWrite>) {
-    let (r, w) = cloexec_pipe();
-    (
+) -> CrecheResult<(Box<InterprocessPipeRead>, Box<InterprocessPipeWrite>)> {
+    let (r, w) = cloexec_pipe()?;
+    Ok((
         Box::new(InterprocessPipeRead {
             child_fd: read_fd,
             read_fd: Some(r),
@@ -214,7 +219,7 @@ pub fn interprocess_pipe(
             child_fd: write_fd,
             write_fd: Some(w),
         }),
-    )
+    ))
 }
 
 pub struct InterprocessPipeWrite {
@@ -225,7 +230,9 @@ impl ConfigureIO for InterprocessPipeWrite {
     fn child_post_fork(&self) {
         let fd = self.write_fd.as_ref().map(|x| x.as_raw_fd()).unwrap();
         // stdout usually
-        _ = dup2(fd, self.child_fd);
+        unsafe {
+            libc::dup2(fd, self.child_fd);
+        }
     }
 
     fn parent_post_fork(&mut self) {
@@ -241,7 +248,9 @@ impl ConfigureIO for InterprocessPipeRead {
     fn child_post_fork(&self) {
         let fd = self.read_fd.as_ref().map(|x| x.as_raw_fd()).unwrap();
         // stdin usually
-        _ = dup2(fd, self.child_fd);
+        unsafe {
+            libc::dup2(fd, self.child_fd);
+        }
     }
 
     fn parent_post_fork(&mut self) {
@@ -297,8 +306,10 @@ pub struct RedirectToFd {
 impl ConfigureIO for RedirectToFd {
     fn child_post_fork(&self) {
         let fd = self.owned_fd.as_ref().map(|x| x.as_raw_fd()).unwrap();
-        _ = dup2(fd, self.child_fd);
-        _ = nix::unistd::close(fd).expect("Should have closed fd");
+        unsafe {
+            libc::dup2(fd, self.child_fd);
+            libc::close(fd);
+        }
     }
 
     fn parent_post_fork(&mut self) {

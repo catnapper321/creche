@@ -26,10 +26,12 @@ pub mod ioconfig;
 /// configuring pipes. See [`ioconfig::interprocess_pipe()`].
 pub mod pipeline;
 mod utils;
+mod pidfd;
+mod error;
+mod pipe;
 
 // re-exports
-pub use creche::{Child, ChildBuilder, ChildHandle, SignalError};
-pub use nix::errno::Errno;
-pub use nix::sys::wait::WaitStatus;
+pub use creche::ChildBuilder;
 pub use pipeline::{PipelineChildren, SimplePipelineBuilder};
 pub use utils::Argument;
+pub use error::*;

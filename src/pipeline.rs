@@ -1,11 +1,11 @@
 use crate::*;
 use ioconfig::{interprocess_pipe, InterprocessPipeRead};
-use nix::sys::wait::WaitStatus;
 use std::{
     fs::File,
     os::fd::{AsRawFd, RawFd},
 };
 use utils::*;
+use super::pidfd::*;
 
 /// Constructs a pipeline that connects stdout of a child process to
 /// stdin of the next child process, except for stdin of the first
@@ -91,7 +91,7 @@ impl SimplePipelineBuilder {
     ///
     /// Returns a [`PipelineChildren`] value that may be `.wait()`ed
     /// to get the exit status of each child process.
-    pub fn spawn(&mut self) -> PipelineChildren {
+    pub fn spawn(&mut self) -> CrecheResult<PipelineChildren> {
         if self.builders.len() == 0 {
             panic!("Pipeline has no processes to spawn");
         }
@@ -103,12 +103,12 @@ impl SimplePipelineBuilder {
             match builder {
                 HeadBodyTail::Only(_) => (),
                 HeadBodyTail::Head(x) => {
-                    let (r, w) = interprocess_pipe(0, 1);
+                    let (r, w) = interprocess_pipe(0, 1)?;
                     x.config_io(w);
                     pipe_read = Some(r);
                 }
                 HeadBodyTail::Body(x) => {
-                    let (r, w) = interprocess_pipe(0, 1);
+                    let (r, w) = interprocess_pipe(0, 1)?;
                     x.config_io(w);
                     if let Some(prev_r) = pipe_read.take() {
                         x.config_io(prev_r);
@@ -131,10 +131,10 @@ impl SimplePipelineBuilder {
             if let Some(env) = self.env.as_ref() {
                 builder.set_env(env.clone());
             }
-            let child = builder.spawn();
+            let child = builder.spawn()?;
             children.push(child);
         }
-        PipelineChildren { children }
+        Ok(PipelineChildren { children })
     }
 }
 
@@ -145,10 +145,10 @@ impl SimplePipelineBuilder {
 /// order that the ``ChildBuilder``s were added to the pipeline
 /// builder.
 pub struct PipelineChildren {
-    children: Vec<Child>,
+    children: Vec<Pidfd>,
 }
 impl PipelineChildren {
-    pub fn wait(&mut self) -> Option<Vec<WaitStatus>> {
+    pub fn wait(&mut self) -> Option<Vec<ChildStatus>> {
         if self.children.len() == 0 {
             return None;
         }
@@ -165,7 +165,7 @@ impl PipelineChildren {
         }
         Some(wait_results)
     }
-    pub fn children(&self) -> &[Child] {
+    pub fn children(&self) -> &[Pidfd] {
         self.children.as_ref()
     }
 }
