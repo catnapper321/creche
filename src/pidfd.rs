@@ -32,22 +32,6 @@ pub fn clone_process() -> CrecheResult<Option<Pidfd>> {
     }
 }
 
-// pub fn clone3_test() -> CrecheResult<()> {
-//     if let Some(pidfd) = clone_process()? {
-//         // parent
-//         println!("pidfd is {:?}", pidfd);
-//         let status = pidfd.wait()?;
-//         println!("exit status was: {:?}", status);
-//     } else {
-//         // child
-//         println!("In child! Waiting...");
-//         sleep(Duration::from_secs(1));
-//         std::process::exit(2);
-//     }
-
-//     Ok(())
-// }
-
 #[repr(C)]
 struct CloneArgs {
     flags: u64,

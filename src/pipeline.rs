@@ -149,7 +149,7 @@ pub struct PipelineChildren {
 }
 impl PipelineChildren {
     // TODO: spin up an epoll instance + state machine instead of waiting
-    // in series
+    // in series. Should return a CrecheResult.
     pub fn wait(&mut self) -> Option<Vec<ChildStatus>> {
         if self.children.len() == 0 {
             return None;
