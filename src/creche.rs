@@ -5,11 +5,12 @@ use pidfd::*;
 // use nix::unistd::{execvp, fork, ForkResult, Pid};
 // pub use nix::{errno::Errno, sys::signal::Signal, sys::wait::WaitStatus};
 use std::{
-    ffi::{CString, OsString},
+    ffi::{CString, OsString, c_char},
     fs::File,
     ops::Deref,
     os::fd::{AsRawFd, OwnedFd, RawFd},
     sync::{Arc, Weak},
+    ptr,
 };
 use utils::Argument;
 
@@ -215,7 +216,6 @@ impl ChildBuilder {
         // if let Some(chdir) = self.chdir.take() {
         //     nix::unistd::chdir(chdir.as_os_str()).expect("Should have changed directory");
         // }
-        // set up the environment
         if let Some(env) = self.env.take() {
             self.exec_with_env(&env);
         } else {
@@ -223,13 +223,35 @@ impl ChildBuilder {
         }
         unreachable!()
     }
-    pub fn exec(self) {
-        // TODO: exec
-        // _ = nix::unistd::execvp(&self.bin, self.args.as_slice());
+    pub fn exec(self) -> CrecheResult<()> {
+        let mut args: Vec<*const c_char> = self.args.iter().map(|x| x.as_ptr() ).collect();
+        // NOTE: must append null ptr to the arg list
+        args.push(ptr::null_mut());
+        let bin: *const c_char = self.bin.as_ptr();
+        unsafe {
+            wrap_errno(
+                ErrorKind::Exec, 
+                Op::Run,
+                libc::execvp(bin, args.as_ptr())
+            )?;
+        }
+        Ok(())
     }
-    pub fn exec_with_env(self, env: &[CString]) {
-        // TODO:
-        // _ = nix::unistd::execvpe(&self.bin, self.args.as_slice(), &env);
+    pub fn exec_with_env(self, env: &[CString]) -> CrecheResult<()> {
+        let mut envs: Vec<*const c_char> = env.iter().map(|x| x.as_ptr()).collect();
+        let mut args: Vec<*const c_char> = self.args.iter().map(|x| x.as_ptr() ).collect();
+        // NOTE: must append null ptr to the arg and env lists
+        args.push(ptr::null_mut());
+        envs.push(ptr::null_mut());
+        let bin: *const c_char = self.bin.as_ptr();
+        unsafe {
+            wrap_errno(
+                ErrorKind::Exec, 
+                Op::Run,
+                libc::execvpe(bin, args.as_ptr(), envs.as_ptr())
+            )?;
+        }
+        Ok(())
     }
 }
 

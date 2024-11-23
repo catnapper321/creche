@@ -73,6 +73,7 @@ impl Error {
 pub enum ErrorKind {
     Pidfd,
     Pipe,
+    Exec,
 }
 
 #[non_exhaustive]
@@ -82,7 +83,8 @@ pub enum Op {
     Read,
     Write,
     Wait,
-    Signal
+    Signal,
+    Run,
 }
 
 #[inline(always)]
