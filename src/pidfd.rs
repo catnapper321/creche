@@ -242,4 +242,19 @@ impl Pidfd {
     pub fn pid(&self) -> i64 {
         self.pid
     }
+    pub fn signal(&self, signo: i32) -> CrecheResult<()> {
+        let ptr: *mut libc::siginfo_t = ptr::null_mut();
+        unsafe {
+            _ = wrap_syscall(
+                ErrorKind::Pidfd,
+                Op::Signal,
+                syscall(libc::SYS_pidfd_send_signal,
+                    self.fd,
+                    signo,
+                    ptr,
+                    0)
+            );
+        }
+        Ok(())
+    }
 }

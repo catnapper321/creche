@@ -82,6 +82,7 @@ pub enum Op {
     Read,
     Write,
     Wait,
+    Signal
 }
 
 #[inline(always)]
