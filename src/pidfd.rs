@@ -70,13 +70,13 @@ impl CloneArgs {
     pub fn set_flags(&mut self, flags: CLONE) {
         self.flags = flags.bits() as u64;
     }
-    pub fn set_sigchld(&mut self, value: bool) {
-        if value { 
-            self.exit_signal = libc::SIGCHLD as u64;
-        } else {
-            self.exit_signal = 0;
-        }
-    }
+    // pub fn set_sigchld(&mut self, value: bool) {
+    //     if value { 
+    //         self.exit_signal = libc::SIGCHLD as u64;
+    //     } else {
+    //         self.exit_signal = 0;
+    //     }
+    // }
 }
 impl Default for CloneArgs {
     fn default() -> Self {
@@ -95,12 +95,12 @@ impl Default for CloneArgs {
         }
     }
 }
-impl CloneArgs {
-    /// Default termination signal is SIGCHLD (17)
-    pub fn set_exit_signal(&mut self, signal: c_int) {
-        self.exit_signal = signal as u64;
-    }
-}
+// impl CloneArgs {
+//     /// Default termination signal is SIGCHLD (17)
+//     pub fn set_exit_signal(&mut self, signal: c_int) {
+//         self.exit_signal = signal as u64;
+//     }
+// }
 
 /// Assuming the pidfd was not made with NONBLOCK and clone3 was
 /// configurated to signal on task termination, this function waits for and
@@ -151,6 +151,8 @@ pub enum ChildStatusKind {
     Continued,
     Unknown
 }
+
+#[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 pub struct ChildStatus {
     kind: ChildStatusKind,
@@ -170,7 +172,6 @@ impl From<WaitSiginfoT> for ChildStatus {
         ChildStatus { kind, status: value.status }
     }
 }
-
 
 bitflags::bitflags! {
     pub struct CLONE: c_int {
